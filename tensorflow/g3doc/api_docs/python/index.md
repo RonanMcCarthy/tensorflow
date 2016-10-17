@@ -198,6 +198,7 @@
   * [`erf`](../../api_docs/python/math_ops.md#erf)
   * [`erfc`](../../api_docs/python/math_ops.md#erfc)
   * [`exp`](../../api_docs/python/math_ops.md#exp)
+  * [`eye`](../../api_docs/python/math_ops.md#eye)
   * [`fft`](../../api_docs/python/math_ops.md#fft)
   * [`fft2d`](../../api_docs/python/math_ops.md#fft2d)
   * [`fft3d`](../../api_docs/python/math_ops.md#fft3d)
@@ -240,6 +241,7 @@
   * [`reduce_max`](../../api_docs/python/math_ops.md#reduce_max)
   * [`reduce_mean`](../../api_docs/python/math_ops.md#reduce_mean)
   * [`reduce_min`](../../api_docs/python/math_ops.md#reduce_min)
+  * [`reduce_nnz`](../../api_docs/python/math_ops.md#reduce_nnz)
   * [`reduce_prod`](../../api_docs/python/math_ops.md#reduce_prod)
   * [`reduce_sum`](../../api_docs/python/math_ops.md#reduce_sum)
   * [`round`](../../api_docs/python/math_ops.md#round)
@@ -580,7 +582,9 @@
   * [`merge_summary`](../../api_docs/python/train.md#merge_summary)
   * [`MomentumOptimizer`](../../api_docs/python/train.md#MomentumOptimizer)
   * [`MonitoredSession`](../../api_docs/python/train.md#MonitoredSession)
+  * [`MonitoredTrainingSession`](../../api_docs/python/train.md#MonitoredTrainingSession)
   * [`NanLossDuringTrainingError`](../../api_docs/python/train.md#NanLossDuringTrainingError)
+  * [`NanTensorHook`](../../api_docs/python/train.md#NanTensorHook)
   * [`Optimizer`](../../api_docs/python/train.md#Optimizer)
   * [`QueueRunner`](../../api_docs/python/train.md#QueueRunner)
   * [`replica_device_setter`](../../api_docs/python/train.md#replica_device_setter)
@@ -696,7 +700,6 @@
   * [`viterbi_decode`](../../api_docs/python/contrib.crf.md#viterbi_decode)
 
 * **[Statistical distributions (contrib)](../../api_docs/python/contrib.distributions.md)**:
-  * [`BaseDistribution`](../../api_docs/python/contrib.distributions.md#BaseDistribution)
   * [`Bernoulli`](../../api_docs/python/contrib.distributions.md#Bernoulli)
   * [`BernoulliWithSigmoidP`](../../api_docs/python/contrib.distributions.md#BernoulliWithSigmoidP)
   * [`Beta`](../../api_docs/python/contrib.distributions.md#Beta)
@@ -738,6 +741,14 @@
   * [`Uniform`](../../api_docs/python/contrib.distributions.md#Uniform)
   * [`WishartCholesky`](../../api_docs/python/contrib.distributions.md#WishartCholesky)
   * [`WishartFull`](../../api_docs/python/contrib.distributions.md#WishartFull)
+
+* **[Random variable transformations (contrib)](../../api_docs/python/contrib.distributions.bijector.md)**:
+  * [`Bijector`](../../api_docs/python/contrib.distributions.bijector.md#Bijector)
+  * [`Exp`](../../api_docs/python/contrib.distributions.bijector.md#Exp)
+  * [`Identity`](../../api_docs/python/contrib.distributions.bijector.md#Identity)
+  * [`Inline`](../../api_docs/python/contrib.distributions.bijector.md#Inline)
+  * [`ScaleAndShift`](../../api_docs/python/contrib.distributions.bijector.md#ScaleAndShift)
+  * [`Softplus`](../../api_docs/python/contrib.distributions.bijector.md#Softplus)
 
 * **[FFmpeg (contrib)](../../api_docs/python/contrib.ffmpeg.md)**:
   * [`decode_audio`](../../api_docs/python/contrib.ffmpeg.md#decode_audio)
@@ -944,8 +955,6 @@
   * [`sigmoid_cross_entropy`](../../api_docs/python/contrib.losses.md#sigmoid_cross_entropy)
   * [`softmax_cross_entropy`](../../api_docs/python/contrib.losses.md#softmax_cross_entropy)
   * [`sparse_softmax_cross_entropy`](../../api_docs/python/contrib.losses.md#sparse_softmax_cross_entropy)
-  * [`sum_of_pairwise_squares`](../../api_docs/python/contrib.losses.md#sum_of_pairwise_squares)
-  * [`sum_of_squares`](../../api_docs/python/contrib.losses.md#sum_of_squares)
 
 * **[RNN (contrib)](../../api_docs/python/contrib.rnn.md)**:
   * [`AttentionCellWrapper`](../../api_docs/python/contrib.rnn.md#AttentionCellWrapper)
@@ -1000,6 +1009,7 @@
   * [`bucket`](../../api_docs/python/contrib.training.md#bucket)
   * [`bucket_by_sequence_length`](../../api_docs/python/contrib.training.md#bucket_by_sequence_length)
   * [`NextQueuedSequenceBatch`](../../api_docs/python/contrib.training.md#NextQueuedSequenceBatch)
+  * [`rejection_sample`](../../api_docs/python/contrib.training.md#rejection_sample)
   * [`resample_at_rate`](../../api_docs/python/contrib.training.md#resample_at_rate)
   * [`SequenceQueueingStateSaver`](../../api_docs/python/contrib.training.md#SequenceQueueingStateSaver)
   * [`stratified_sample`](../../api_docs/python/contrib.training.md#stratified_sample)

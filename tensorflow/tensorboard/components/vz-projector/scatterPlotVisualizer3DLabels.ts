@@ -13,16 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-import {HoverContext} from './hoverContext';
-import {NearestEntry} from './knn';
 import {RenderContext} from './renderContext';
 import {DataSet} from './scatterPlot';
 import {ScatterPlotVisualizer} from './scatterPlotVisualizer';
-import {SelectionContext} from './selectionContext';
 import {createTexture} from './util';
 
 const FONT_SIZE = 80;
 const ONE_OVER_FONT_SIZE = 1 / FONT_SIZE;
+const LABEL_SCALE = 2.2;  // at 1:1 texel/pixel ratio
 const LABEL_COLOR = 'black';
 const LABEL_BACKGROUND = 'white';
 const MAX_CANVAS_DIMENSION = 8192;
@@ -31,10 +29,6 @@ const RGB_ELEMENTS_PER_ENTRY = 3;
 const XYZ_ELEMENTS_PER_ENTRY = 3;
 const UV_ELEMENTS_PER_ENTRY = 2;
 const VERTICES_PER_GLYPH = 2 * 3;  // 2 triangles, 3 verts per triangle
-
-const VERTEX_COLOR_UNSELECTED = 0xFFFFFF;
-const VERTEX_COLOR_SELECTED = '#FA6666';
-const VERTEX_COLOR_HIGHLIGHT = '#760B4F';
 
 /**
  * Each label is made up of triangles (two per letter.) Each vertex, then, is
@@ -55,17 +49,6 @@ const VERTEX_SHADER = `
     varying vec2 vUv;
     varying vec3 vColor;
 
-    float getPointScale() {
-      float normalScale = 3.0;
-      // Distance to the camera (world coordinates.) This is the scale factor.
-      // Note that positions of verts are in world space, scaled so that the
-      // lineheight is 1.
-      vec4 posCamSpace = modelViewMatrix * vec4(position, 1.0);
-      float distToCam = length(posCamSpace.z);
-      float scale = max(min(distToCam * 10.0, normalScale), distToCam * 2.0);
-      return scale * ${ONE_OVER_FONT_SIZE};
-    }
-
     void main() {
       vUv = uv;
       vColor = color;
@@ -83,10 +66,10 @@ const VERTEX_SHADER = `
 
       mat4 pointToCamera = mat4(vRight, vUp, vAt, vec4(0, 0, 0, 1));
 
-      vec2 posObj = posObj * getPointScale();
+      vec2 scaledPos = posObj * ${ONE_OVER_FONT_SIZE} * ${LABEL_SCALE};
 
-      vec4 posRotated = pointToCamera * vec4(posObj, 0.00001, 1.0);
-      vec4 mvPosition = modelViewMatrix * (vec4(position, 0.0) + posRotated);
+      vec4 posRotated = pointToCamera * vec4(scaledPos, 0, 1);
+      vec4 mvPosition = modelViewMatrix * (vec4(position, 0) + posRotated);
       gl_Position = projectionMatrix * mvPosition;
     }`;
 
@@ -114,9 +97,6 @@ type GlyphTexture = {
  */
 export class ScatterPlotVisualizer3DLabels implements ScatterPlotVisualizer {
   private dataSet: DataSet;
-  private selectedPointIndices: number[] = [];
-  private neighborsOfFirstPoint: NearestEntry[] = [];
-  private hoverPointIndex: number;
   private scene: THREE.Scene;
   private labelAccessor: (index: number) => string;
   private geometry: THREE.BufferGeometry;
@@ -130,15 +110,7 @@ export class ScatterPlotVisualizer3DLabels implements ScatterPlotVisualizer {
   private labelVertexMap: number[][];
   private glyphTexture: GlyphTexture;
 
-  constructor(selectionContext: SelectionContext, hoverContext: HoverContext) {
-    selectionContext.registerSelectionChangedListener(
-        (s: number[], n: NearestEntry[]) => {
-          this.selectedPointIndices = s;
-          this.neighborsOfFirstPoint = n;
-        });
-    hoverContext.registerHoverListener((h: number) => {
-      this.hoverPointIndex = h;
-    });
+  constructor() {
     this.glyphTexture = this.createGlyphTexture();
 
     this.uniforms = {
@@ -322,54 +294,22 @@ export class ScatterPlotVisualizer3DLabels implements ScatterPlotVisualizer {
     }
   }
 
-  private colorSprites(unselectedPointColors?: Float32Array) {
-    if (this.geometry == null || this.dataSet == null) {
+  private colorSprites(pointColors?: Float32Array) {
+    if (this.labelAccessor == null || this.geometry == null ||
+        this.dataSet == null || pointColors == null) {
       return;
     }
-
-    const unselectedColor = new THREE.Color(VERTEX_COLOR_UNSELECTED);
-    const selectedColor = new THREE.Color(VERTEX_COLOR_SELECTED);
 
     const colors = this.geometry.getAttribute('color') as THREE.BufferAttribute;
     colors.array = this.renderColors;
 
-    if (unselectedPointColors == null) {
-      const n = this.dataSet.points.length;
-      for (let i = 0; i < n; i++) {
-        this.labelVertexMap[i].forEach((j) => {
-          colors.setXYZ(
-              j, unselectedColor.r, unselectedColor.g, unselectedColor.b);
-        });
-      }
-    } else {
-      const n = this.dataSet.points.length;
-      let src = 0;
-      for (let i = 0; i < n; ++i) {
-        const c = new THREE.Color(
-            unselectedPointColors[src++], unselectedPointColors[src++],
-            unselectedPointColors[src++]);
-        this.labelVertexMap[i].forEach((j) => {
-          colors.setXYZ(j, c.r, c.g, c.b);
-        });
-      }
-    }
-
-    let labelIndices: number[] = [];
-    this.selectedPointIndices.forEach(i => labelIndices.push(i));
-    this.neighborsOfFirstPoint.forEach(n => labelIndices.push(n.index));
-
-    for (let i = 0; i < labelIndices.length; i++) {
-      let assocPoint = labelIndices[i];
-      this.labelVertexMap[assocPoint].forEach((j) => {
-        colors.setXYZ(j, selectedColor.r, selectedColor.g, selectedColor.b);
-      });
-    }
-
-    if (this.hoverPointIndex) {
-      const p = this.hoverPointIndex;
-      const c = new THREE.Color(VERTEX_COLOR_HIGHLIGHT);
-      this.labelVertexMap[p].forEach((i) => {
-        colors.setXYZ(i, c.r, c.g, c.b);
+    const n = this.dataSet.points.length;
+    let src = 0;
+    for (let i = 0; i < n; ++i) {
+      const c = new THREE.Color(
+          pointColors[src++], pointColors[src++], pointColors[src++]);
+      this.labelVertexMap[i].forEach((j) => {
+        colors.setXYZ(j, c.r, c.g, c.b);
       });
     }
 
@@ -398,9 +338,10 @@ export class ScatterPlotVisualizer3DLabels implements ScatterPlotVisualizer {
 
   onDataSet(dataSet: DataSet, spriteImage: HTMLImageElement) {
     this.dataSet = dataSet;
+    this.labelAccessor = null;
   }
 
-  onPickingRender(camera: THREE.Camera, cameraTarget: THREE.Vector3) {
+  onPickingRender(rc: RenderContext) {
     this.material.uniforms.texture.value = this.glyphTexture.texture;
     this.material.uniforms.picking.value = true;
 
@@ -410,7 +351,7 @@ export class ScatterPlotVisualizer3DLabels implements ScatterPlotVisualizer {
   }
 
   onRender(rc: RenderContext) {
-    this.colorSprites(rc.unselectedPointColors);
+    this.colorSprites(rc.pointColors);
 
     this.material.uniforms.texture.value = this.glyphTexture.texture;
     this.material.uniforms.picking.value = false;

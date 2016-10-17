@@ -17,13 +17,17 @@ cc_library(
 )
 
 cc_library(
+    name = "signature_constants",
+    hdrs = ["signature_constants.h"],
+)
+
+cc_library(
     name = "loader",
     srcs = ["loader.cc"],
     hdrs = ["loader.h"],
     deps = [
         ":constants",
         "//tensorflow/core:core_cpu",
-        "//tensorflow/core:framework",
         "//tensorflow/core:lib",
         "//tensorflow/core:protos_all_cc",
         "//tensorflow/core:tensorflow",
@@ -40,7 +44,9 @@ tf_cc_test(
     deps = [
         ":constants",
         ":loader",
+        ":signature_constants",
         "//tensorflow/core:lib",
+        "//tensorflow/core:protos_all_cc",
         "//tensorflow/core:test",
         "//tensorflow/core:test_main",
         "//tensorflow/core:testlib",

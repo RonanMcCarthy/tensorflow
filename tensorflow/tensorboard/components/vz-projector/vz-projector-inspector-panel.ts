@@ -13,12 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-import {DistanceFunction} from './data';
+import {DistanceFunction, MetadataInfo} from './data';
 import * as vector from './vector';
 import {ProjectorInput} from './vz-projector-input';
 import {Projector} from './vz-projector';
 import * as knn from './knn';
-import {MetadataResult} from './data-loader';
 
 // tslint:disable-next-line:no-unused-variable
 import {PolymerElement, PolymerHTMLElement} from './vz-projector-util';
@@ -82,8 +81,7 @@ export class InspectorPanel extends PolymerClass {
     } else {
       this.selectedPointIndex = null;
     }
-    this.updateMetadata();
-    this.updateIsolateButton(indices.length);
+    this.updateFilterButtons(indices.length + neighbors.length);
     this.updateNeighborsList(neighbors);
     if (neighbors.length === 0) {
       this.updateSearchResults(indices);
@@ -92,9 +90,9 @@ export class InspectorPanel extends PolymerClass {
     }
   }
 
-  metadataChanged(result: MetadataResult) {
+  metadataChanged(metadata: MetadataInfo) {
     let labelIndex = -1;
-    this.metadataFields = result.stats.map((stats, i) => {
+    this.metadataFields = metadata.stats.map((stats, i) => {
       if (!stats.isNumeric && labelIndex === -1) {
         labelIndex = i;
       }
@@ -102,7 +100,7 @@ export class InspectorPanel extends PolymerClass {
     });
     labelIndex = Math.max(0, labelIndex);
     // Make the default label the first non-numeric column.
-    this.selectedMetadataField = result.stats[labelIndex].name;
+    this.selectedMetadataField = metadata.stats[labelIndex].name;
   }
 
   datasetChanged() {
@@ -202,7 +200,7 @@ export class InspectorPanel extends PolymerClass {
     });
   }
 
-  private updateIsolateButton(numPoints: number) {
+  private updateFilterButtons(numPoints: number) {
     if (numPoints > 1) {
       this.setFilterButton.text(`Isolate ${numPoints} points`)
           .attr('disabled', null);
@@ -210,46 +208,6 @@ export class InspectorPanel extends PolymerClass {
     } else {
       this.setFilterButton.attr('disabled', true);
       this.clearSelectionButton.attr('disabled', true);
-    }
-  }
-
-  /** Updates the displayed metadata for the selected point. */
-  private updateMetadata() {
-    let metadataContainerElement = this.dom.select('.metadata');
-    metadataContainerElement.selectAll('*').remove();
-    let point = null;
-    if (this.projector.currentDataSet != null &&
-        this.selectedPointIndex != null) {
-      point = this.projector.currentDataSet.points[this.selectedPointIndex];
-    }
-    this.dom.select('.metadata-container')
-        .style('display', point != null ? '' : 'none');
-
-    if (point == null) {
-      return;
-    }
-
-    for (let metadataKey in point.metadata) {
-      if (!point.metadata.hasOwnProperty(metadataKey)) {
-        continue;
-      }
-      let rowElement = document.createElement('div');
-      rowElement.className = 'metadata-row';
-
-      let keyElement = document.createElement('div');
-      keyElement.className = 'metadata-key';
-      keyElement.textContent = metadataKey;
-
-      let valueElement = document.createElement('div');
-      valueElement.className = 'metadata-value';
-      valueElement.textContent = '' + point.metadata[metadataKey];
-
-      rowElement.appendChild(keyElement);
-      rowElement.appendChild(valueElement);
-
-      metadataContainerElement.append(function() {
-        return this.appendChild(rowElement);
-      });
     }
   }
 
@@ -296,19 +254,22 @@ export class InspectorPanel extends PolymerClass {
     });
 
     // Nearest neighbors controls.
-    let numNNInput = this.dom.select('.num-nn input');
+    let numNNInput = this.$$('#nn-slider') as HTMLInputElement;
     let updateNumNN = () => {
-      this.numNN = +numNNInput.property('value');
-      this.dom.select('.num-nn span').text(this.numNN);
+      this.numNN = +numNNInput.value;
+      this.dom.select('.num-nn .nn-count').text(this.numNN);
+      if (this.selectedPointIndex != null) {
+        this.projector.notifySelectionChanged([this.selectedPointIndex]);
+      }
     };
-    numNNInput.on('input', updateNumNN);
+    numNNInput.addEventListener('change', updateNumNN);
     updateNumNN();
 
     // Filtering dataset.
     this.setFilterButton.on('click', () => {
       this.projector.filterDataset();
       this.resetFilterButton.attr('disabled', null);
-      this.updateIsolateButton(0);
+      this.updateFilterButtons(0);
     });
 
     this.resetFilterButton.on('click', () => {
@@ -317,7 +278,7 @@ export class InspectorPanel extends PolymerClass {
     });
 
     this.clearSelectionButton.on('click', () => {
-      this.projector.clearSelection();
+      this.projector.clearSelectionAndHover();
     });
     this.resetFilterButton.attr('disabled', true);
   }

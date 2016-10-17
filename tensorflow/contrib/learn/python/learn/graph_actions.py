@@ -40,7 +40,6 @@ from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import data_flow_ops
 from tensorflow.python.ops import logging_ops
 from tensorflow.python.ops import variables
-from tensorflow.python.platform import gfile
 from tensorflow.python.platform import tf_logging as logging
 from tensorflow.python.training import basic_session_run_hooks
 from tensorflow.python.training import coordinator
@@ -88,7 +87,6 @@ def _make_saver(graph, keep_checkpoint_max=5):
 
 def _restore_from_checkpoint(session, graph, checkpoint_path, saver=None):
   logging.info('Loading model from checkpoint: %s.', checkpoint_path)
-  assert gfile.Glob(checkpoint_path)
   saver = saver or _make_saver(graph)
   if saver:
     saver.restore(session, checkpoint_path)
@@ -128,6 +126,7 @@ def _monitored_train(graph,
                      supervisor_save_model_secs=600,
                      supervisor_save_model_steps=None,
                      keep_checkpoint_max=5,
+                     supervisor_save_summaries_secs=None,
                      supervisor_save_summaries_steps=100,
                      feed_fn=None,
                      steps=None,
@@ -166,7 +165,7 @@ def _monitored_train(graph,
       current loss. A `0` or negative value disables logging.
     supervisor_is_chief: Whether the current process is the chief supervisor in
       charge of restoring the model and running standard services.
-    supervisor_master: The master string to use when preparing the session.      
+    supervisor_master: The master string to use when preparing the session.
     supervisor_save_model_secs: Save checkpoints every this many seconds. Can
         not be specified with `supervisor_save_model_steps`.
     supervisor_save_model_steps: Save checkpoints every this many steps. Can not
@@ -175,8 +174,12 @@ def _monitored_train(graph,
       keep. As new files are created, older files are deleted. If None or 0,
       all checkpoint files are kept. This is simply passed as the max_to_keep
       arg to `tf.Saver` constructor.
+    supervisor_save_summaries_secs: Save summaries every
+      `supervisor_save_summaries_secs` seconds when training.
     supervisor_save_summaries_steps: Save summaries every
-      `supervisor_save_summaries_steps` seconds when training.
+      `supervisor_save_summaries_steps` steps when training. Exactly one of
+      `supervisor_save_model_steps` and `supervisor_save_model_secs` should be
+      specified, and the other should be None.
     feed_fn: A function that is called every iteration to produce a `feed_dict`
       passed to `session.run` calls. Optional.
     steps: Trains for this many steps (e.g. current global step + `steps`).
@@ -269,6 +272,7 @@ def _monitored_train(graph,
               summary_writer=summary_writer))
       all_hooks.append(
           basic_session_run_hooks.SummarySaverHook(
+              save_secs=supervisor_save_summaries_secs,
               save_steps=supervisor_save_summaries_steps,
               summary_writer=summary_writer,
               scaffold=scaffold))

@@ -143,6 +143,7 @@ Try the following commands at the `tfdbg>` prompt:
 | Command example    | Explanation           |
 | ------------- |:--------------------- |
 | `pt hidden/Relu:0` | Print the value of the tensor `hidden/Relu:0`. |
+| `pt hidden/Relu:0[:, 1]` | Print a subarray of the tensor `hidden/Relu:0`, using numpy-style array slicing. |
 | `ni -a hidden/Relu` | Displays information about the node `hidden/Relu`, including node attributes. |
 | `li -r hidden/Relu:0` | List the inputs to the node `hidden/Relu`, recursively, i.e., the input tree. |
 | `lo -r hidden/Relu:0` | List the recipients of the output of the node `hidden/Relu`, recursively, i.e., the output recipient tree. |
@@ -226,13 +227,28 @@ To view the value of the tensor, do
 tfdbg> pt cross_entropy/Log:0
 ```
 
-<!---
-TODO(cais): Once the "/inf" style regex search+highlight+scroll is checked in,
-modify the sentence below to reflect that.
---->
-Scroll down a little and you will notice some scattered inf values. Using the
-following command, you can see that this node has the op type "Log" and that
-its input is the node "softmax/Softmax".
+Scroll down a little and you will notice some scattered `inf` values. If the
+instances of `inf` and `nan` are difficult to spot by eye, you can use the
+following command to perform regex search and highlighting on the screen
+output:
+
+```
+tfdbg> /inf
+
+or
+
+tfdbg> /(inf|nan)
+```
+
+To go back to the list of "offending" tensors, you can use the Up key to
+navigate to the following command and hit Enter:
+
+```
+tfdbg> lt -f has_inf_or_nan
+```
+
+Using the following command, you can see that this node has the op type "Log"
+and that its input is the node "softmax/Softmax".
 
 ```
 tfdbg> ni cross_entropy/Log
@@ -263,11 +279,12 @@ diff = y_ * tf.log(tf.clip_by_value(y, 1e-8, 1.0))
 **Other features of the tfdbg diagnostics CLI:**
 
 <!---
-TODO(cais): Add the following UI features once they are checked in: tab
-completion; regex search and highlighting.
+TODO(cais): Add the following UI features once they are checked in:
+regex search and highlighting.
 --->
 *   Navigation through command history using the Up and Down arrow keys.
     Prefix-based navigation is also supported.
+*   Tab completion of commands and some command arguments.
 
 
 

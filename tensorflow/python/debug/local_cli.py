@@ -23,6 +23,7 @@ import shutil
 import sys
 import tempfile
 
+# Google-internal import(s).
 from tensorflow.python.debug import debug_data
 from tensorflow.python.debug import framework
 from tensorflow.python.debug.cli import analyzer_cli
@@ -37,7 +38,7 @@ _DUMP_ROOT_PREFIX = "tfdbg_"
 class LocalCLIDebugWrapperSession(framework.BaseDebugWrapperSession):
   """Concrete subclass of BaseDebugWrapperSession implementing a local CLI."""
 
-  def __init__(self, sess, dump_root=None):
+  def __init__(self, sess, dump_root=None, log_usage=True):
     """Constructor of LocalCLIDebugWrapperSession.
 
     Args:
@@ -46,11 +47,15 @@ class LocalCLIDebugWrapperSession(framework.BaseDebugWrapperSession):
         a directory that does not exist or an empty directory. If the directory
         does not exist, it will be created by the debugger core during debug
         run() calls and removed afterwards.
+      log_usage: (bool) Whether the usage of this class is to be logged.
 
     Raises:
       ValueError: If dump_root is an existing and non-empty directory or if
         dump_root is a file.
     """
+
+    if log_usage:
+      pass  # No logging for open-source.
 
     framework.BaseDebugWrapperSession.__init__(self, sess)
 
@@ -201,8 +206,13 @@ class LocalCLIDebugWrapperSession(framework.BaseDebugWrapperSession):
     ])
 
     if self._tensor_filters:
+      filter_names = []
       for filter_name in self._tensor_filters:
+        filter_names.append(filter_name)
         help_intro.append("        * " + filter_name)
+
+      # Register tab completion for the filter names.
+      run_start_cli.register_tab_comp_context(["run", "r"], filter_names)
     else:
       help_intro.append("        (None)")
 
@@ -218,7 +228,7 @@ class LocalCLIDebugWrapperSession(framework.BaseDebugWrapperSession):
     if response == debugger_cli_common.EXPLICIT_USER_EXIT:
       # Explicit user "exit" command leads to sys.exit(1).
       print(
-          "Note: user exited from debugger CLI: sys.exit(1) called.",
+          "Note: user exited from debugger CLI: Calling sys.exit(1).",
           file=sys.stderr)
       sys.exit(1)
 
@@ -300,6 +310,25 @@ class LocalCLIDebugWrapperSession(framework.BaseDebugWrapperSession):
           prefix_aliases=["r"]
       )
 
+      # Get names of all dumped tensors.
+      dumped_tensor_names = []
+      for datum in debug_dump.dumped_tensor_data:
+        dumped_tensor_names.append("%s:%d" %
+                                   (datum.node_name, datum.output_slot))
+
+      # Tab completions for command "print_tensors".
+      run_end_cli.register_tab_comp_context(["print_tensor", "pt"],
+                                            dumped_tensor_names)
+
+      # Tab completion for commands "node_info", "list_inputs" and
+      # "list_outputs". The list comprehension is used below because nodes()
+      # output can be unicodes and they need to be converted to strs.
+      run_end_cli.register_tab_comp_context(
+          ["node_info", "ni", "list_inputs", "li", "list_outputs", "lo"],
+          [str(node_name) for node_name in debug_dump.nodes()])
+      # TODO(cais): Reduce API surface area for aliases vis-a-vis tab
+      #    completion contexts and registered command handlers.
+
       title = "run-end: " + self._run_description
       run_end_cli.run_ui(
           init_command=init_command, title=title, title_color=title_color)
@@ -340,12 +369,9 @@ class LocalCLIDebugWrapperSession(framework.BaseDebugWrapperSession):
       action = framework.OnRunStartAction.DEBUG_RUN
       debug_urls = self._get_run_debug_urls()
 
-    annotations = {
-        debugger_cli_common.EXIT_TOKEN_KEY: framework.OnRunStartResponse(
-            action, debug_urls)
-    }
-
-    return debugger_cli_common.RichTextLines([], annotations=annotations)
+    # Raise CommandLineExit exception to cause the CLI to exit.
+    raise debugger_cli_common.CommandLineExit(
+        exit_token=framework.OnRunStartResponse(action, debug_urls))
 
   def _on_run_start_step_handler(self, args, screen_info=None):
     """Command handler for "invoke_stepper" command during on-run-start."""
@@ -355,13 +381,10 @@ class LocalCLIDebugWrapperSession(framework.BaseDebugWrapperSession):
     # No parsing is currently necessary for invoke_stepper. This may change
     # in the future when the command has arguments.
 
-    action = framework.OnRunStartAction.INVOKE_STEPPER
-    annotations = {
-        debugger_cli_common.EXIT_TOKEN_KEY: framework.OnRunStartResponse(action,
-                                                                         [])
-    }
-
-    return debugger_cli_common.RichTextLines([], annotations=annotations)
+    # Raise CommandLineExit exception to cause the CLI to exit.
+    raise debugger_cli_common.CommandLineExit(
+        exit_token=framework.OnRunStartResponse(
+            framework.OnRunStartAction.INVOKE_STEPPER, []))
 
   def _run_end_run_command_handler(self, args, screen_info=None):
     """Handler for incorrectly entered run command at run-end prompt."""

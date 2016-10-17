@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-import {runAsyncTask} from './async';
+import {runAsyncTask, updateWarningMessage} from './async';
 import {TSNE} from './bh_tsne';
 import * as knn from './knn';
 import * as scatterPlot from './scatterPlot';
@@ -24,6 +24,35 @@ export type DistanceFunction = (a: number[], b: number[]) => number;
 
 export interface PointMetadata {
   [key: string]: number | string;
+}
+
+export interface DataProto {
+  shape: [number, number];
+  tensor: number[];
+  metadata: {
+    columns: Array<{
+      name: string;
+      stringValues: string[];
+      numericValues: number[];
+    }>;
+  };
+}
+
+/** Statistics for a metadata column. */
+export interface ColumnStats {
+  name: string;
+  isNumeric: boolean;
+  tooManyUniqueValues: boolean;
+  uniqueEntries?: {label: string, count: number}[];
+  min: number;
+  max: number;
+}
+
+export interface MetadataInfo {
+  stats: ColumnStats[];
+  pointsInfo: PointMetadata[];
+  spriteImage?: HTMLImageElement;
+  datasetInfo?: DatasetMetadata;
 }
 
 export interface DataPoint extends scatterPlot.DataPoint {
@@ -89,7 +118,7 @@ export class DataSet implements scatterPlot.DataSet {
   dim = [0, 0];
   hasTSNERun: boolean = false;
   spriteImage: HTMLImageElement;
-  metadata: DatasetMetadata;
+  datasetInfo: DatasetMetadata;
 
   private tsne: TSNE;
 
@@ -296,8 +325,15 @@ export class DataSet implements scatterPlot.DataSet {
     });
   }
 
-  mergeMetadata(metadata: PointMetadata[]) {
-    metadata.forEach((m, i) => this.points[i].metadata = m);
+  mergeMetadata(info: MetadataInfo) {
+    if (info.pointsInfo.length !== this.points.length) {
+      updateWarningMessage(
+          `Number of tensors (${this.points.length}) do not match` +
+          ` the number of lines in metadata (${info.pointsInfo.length}).`);
+    }
+    this.spriteImage = info.spriteImage;
+    this.datasetInfo = info.datasetInfo;
+    info.pointsInfo.forEach((m, i) => this.points[i].metadata = m);
   }
 
   stopTSNE() { this.tSNEShouldStop = true; }
@@ -376,7 +412,7 @@ export interface State {
   selectedProjection?: Projection;
 
   /** The computed projections of the tensors. */
-  projections?: {[key: string]: number}[];
+  projections?: Array<{[key: string]: number}>;
 
   /** The indices of selected points. */
   selectedPoints?: number[];
@@ -388,8 +424,11 @@ export interface State {
   cameraTarget?: vector.Point3D;
 
   /** Color by option. */
-  colorOption?: ColorOption;
+  selectedColorOptionName?: string;
 
   /** Label by option. */
-  labelOption?: string;
+  selectedLabelOption?: string;
+
+  /** Whether the state is a 3d view. If false, the state is a 2d view. */
+  is3d?: boolean;
 }

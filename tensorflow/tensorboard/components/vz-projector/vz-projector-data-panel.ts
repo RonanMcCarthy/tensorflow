@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-import {ColorOption} from './data';
-import {CheckpointInfo, ColumnStats, DataProvider, parseRawMetadata, parseRawTensors} from './data-loader';
+import {ColorOption, ColumnStats} from './data';
+import {CheckpointInfo, DataProvider, parseRawMetadata, parseRawTensors} from './data-loader';
 import {Projector} from './vz-projector';
 import {ColorLegendRenderInfo, ColorLegendThreshold} from './vz-projector-legend';
 // tslint:disable-next-line:no-unused-variable
@@ -25,15 +25,20 @@ export let DataPanelPolymer = PolymerElement({
   properties: {
     selectedTensor: {type: String, observer: '_selectedTensorChanged'},
     selectedRun: {type: String, observer: '_selectedRunChanged'},
-    colorOption: {type: Object, notify: true, observer: '_colorOptionChanged'},
-    labelOption: {type: String, notify: true},
+    selectedColorOptionName: {
+      type: String,
+      notify: true,
+      observer: '_selectedColorOptionNameChanged'
+    },
+    selectedLabelOption:
+        {type: String, notify: true, observer: '_selectedLabelOptionChanged'},
     normalizeData: Boolean
   }
 });
 
 export class DataPanel extends DataPanelPolymer {
-  labelOption: string;
-  colorOption: ColorOption;
+  selectedLabelOption: string;
+  selectedColorOptionName: string;
 
   private normalizeData: boolean;
   private labelOptions: string[];
@@ -98,7 +103,7 @@ export class DataPanel extends DataPanelPolymer {
     } else {
       this.labelOptions = ['label'];
     }
-    this.labelOption = this.labelOptions[Math.max(0, labelIndex)];
+    this.selectedLabelOption = this.labelOptions[Math.max(0, labelIndex)];
 
     // Color by options.
     let standardColorOption: ColorOption[] = [
@@ -121,10 +126,7 @@ export class DataPanel extends DataPanelPolymer {
                 let range = scale.range();
                 // Re-order the range.
                 let newRange = range.map((color, i) => {
-                  let index = (i * 2) % (range.length - 1);
-                  if (index === 0) {
-                    index = range.length - 1;
-                  }
+                  let index = (i * 3) % range.length;
                   return range[index];
                 });
                 items = stats.uniqueEntries;
@@ -150,7 +152,7 @@ export class DataPanel extends DataPanelPolymer {
       standardColorOption.push({name: 'Metadata', isSeparator: true});
     }
     this.colorOptions = standardColorOption.concat(metadataColorOption);
-    this.colorOption = this.colorOptions[0];
+    this.selectedColorOptionName = this.colorOptions[0].name;
   }
 
   setNormalizeData(normalizeData: boolean) {
@@ -161,18 +163,22 @@ export class DataPanel extends DataPanelPolymer {
     if (this.selectedTensor == null) {
       return;
     }
-    this.dataProvider.retrieveTensor(this.selectedRun, this.selectedTensor, ds => {
+    this.dataProvider.retrieveTensor(
+        this.selectedRun, this.selectedTensor, ds => {
       let metadataFile =
           this.checkpointInfo.tensors[this.selectedTensor].metadataFile;
-      this.projector.updateDataSet(ds);
       if (metadataFile) {
         this.dataProvider.retrieveMetadata(
-            this.selectedRun, this.selectedTensor, result => {
-              this.projector.mergeMetadata(result);
-              this.updateMetadataUI(result.stats, metadataFile);
+            this.selectedRun, this.selectedTensor, metadata => {
+              this.projector.updateDataSet(ds, metadata);
+              this.updateMetadataUI(metadata.stats, metadataFile);
             });
+      } else {
+        this.projector.updateDataSet(ds, null);
       }
     });
+    this.projector.setSelectedTensor(
+        this.selectedRun, this.checkpointInfo.tensors[this.selectedTensor]);
   }
 
   _selectedRunChanged() {
@@ -207,13 +213,28 @@ export class DataPanel extends DataPanelPolymer {
     });
   }
 
-  _colorOptionChanged() {
-    if (this.colorOption.map == null) {
+  _selectedLabelOptionChanged() {
+    this.projector.setSelectedLabelOption(this.selectedLabelOption);
+  }
+
+  _selectedColorOptionNameChanged() {
+    let colorOption: ColorOption;
+    for (let i = 0; i < this.colorOptions.length; i++) {
+      if (this.colorOptions[i].name === this.selectedColorOptionName) {
+        colorOption = this.colorOptions[i];
+        break;
+      }
+    }
+    if (!colorOption) {
+      return;
+    }
+
+    if (colorOption.map == null) {
       this.colorLegendRenderInfo = null;
-    } else if (this.colorOption.items) {
-      let items = this.colorOption.items.map(item => {
+    } else if (colorOption.items) {
+      let items = colorOption.items.map(item => {
         return {
-          color: this.colorOption.map(item.label),
+          color: colorOption.map(item.label),
           label: item.label,
           count: item.count
         };
@@ -222,9 +243,10 @@ export class DataPanel extends DataPanelPolymer {
     } else {
       this.colorLegendRenderInfo = {
         items: null,
-        thresholds: this.colorOption.thresholds
+        thresholds: colorOption.thresholds
       };
     }
+    this.projector.setSelectedColorOption(colorOption);
   }
 
   private tensorWasReadFromFile(rawContents: string, fileName: string) {
@@ -232,14 +254,14 @@ export class DataPanel extends DataPanelPolymer {
       this.dom.select('#checkpoint-file')
           .text(fileName)
           .attr('title', fileName);
-      this.projector.updateDataSet(ds);
+      this.projector.updateDataSet(ds, null);
     });
   }
 
   private metadataWasReadFromFile(rawContents: string, fileName: string) {
-    parseRawMetadata(rawContents, result => {
-      this.projector.mergeMetadata(result);
-      this.updateMetadataUI(result.stats, fileName);
+    parseRawMetadata(rawContents, metadata => {
+      this.projector.updateDataSet(this.projector.currentDataSet, metadata);
+      this.updateMetadataUI(metadata.stats, fileName);
     });
   }
 

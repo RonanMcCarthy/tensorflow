@@ -37,11 +37,8 @@ export class ProjectorInput extends PolymerClass {
   label: string;
 
   /** Subscribe to be called everytime the input changes. */
-  onInputChanged(listener: InputChangedListener, callImmediately = true) {
+  onInputChanged(listener: InputChangedListener) {
     this.inputChangedListeners.push(listener);
-    if (callImmediately) {
-      listener(this.paperInput.value, this.inRegexMode);
-    }
   }
 
   ready() {
@@ -93,6 +90,14 @@ export class ProjectorInput extends PolymerClass {
     d3.select(this.paperInput)
         .selectAll('.slash')
         .style('display', this.inRegexMode ? null : 'none');
+  }
+
+  getValue(): string {
+    return this.paperInput.value;
+  }
+
+  getInRegexMode(): boolean {
+    return this.inRegexMode;
   }
 }
 
